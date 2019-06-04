@@ -62,6 +62,14 @@ local lights = {
         angle = 0,
         image = spotlight_texture
     }, 
+	{
+        x = 50,
+        y = 50,
+        color = {0.1, 0, 0.3, 1},
+        radius = 1000,
+        angle = 0,
+        image = light_texture
+    },
 }
 
 -- 'shader_compose' stores a pixel shader used to combine 'screen_lightmap' and
@@ -129,6 +137,7 @@ local world_blocks = {
 	{ x = 300, y = 300, w = 100, h = 100 },
 	{ x = 100, y = 400, w = 50, h = 200 },
 	{ x = 500, y = 400, w = 100, h = 10 },
+	{ x = 300, y = 100, w = 130, h = 100 },
 }
 
 function love.load()
