@@ -365,7 +365,19 @@ function love.draw()
                        sh / floor_texture:getHeight())
 
     -- draw the world blocks
-    love.graphics.setColor(0, 1, 1, 1)
+    love.graphics.setColor(0.8, 0.8, 0.8, 0.8)
+
+    for _, block in ipairs(world_blocks) do
+        love.graphics.rectangle('fill', block.x, block.y, block.w, block.h)
+    end
+
+    -- subtract a constant vec4 from the screen lightmap where it intersects the world
+    -- reduces light brightness on top of world blocks, making diffusion more realistic
+    -- wrote with rendering the world again, might be able to be improved (but probably not)
+    local dc = 0.45
+    love.graphics.setCanvas(screen_lightmap)
+    love.graphics.setColor({ 1, 1, 1, dc });
+    love.graphics.setBlendMode('subtract')
 
     for _, block in ipairs(world_blocks) do
         love.graphics.rectangle('fill', block.x, block.y, block.w, block.h)
