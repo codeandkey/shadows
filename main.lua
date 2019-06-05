@@ -365,7 +365,7 @@ function love.draw()
                        sh / floor_texture:getHeight())
 
     -- draw the world blocks
-    love.graphics.setColor(0.8, 0.8, 0.8, 0.8)
+    love.graphics.setColor(0.9, 0.9, 0.9, 1.0)
 
     for _, block in ipairs(world_blocks) do
         love.graphics.rectangle('fill', block.x, block.y, block.w, block.h)
