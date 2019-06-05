@@ -3,14 +3,14 @@
 
     Copyright 2019 Justin Stanley
 
-	Permission is hereby granted, free of charge, to any person obtaining a
+    Permission is hereby granted, free of charge, to any person obtaining a
     copy of this software and associated documentation files (the "Software"),
     to deal in the Software without restriction, including without limitation
     the rights to use, copy, modify, merge, publish, distribute, sublicense,
     and/or sell copies of the Software, and to permit persons to whom the
     Software is furnished to do so, subject to the following conditions:
 
-	The above copyright notice and this permission notice shall be included in
+    The above copyright notice and this permission notice shall be included in
     all copies or substantial portions of the Software.
 
     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
@@ -46,7 +46,7 @@ local floor_texture = love.graphics.newImage('floor.png')
 -- lights[1] will be moved by the mouse cursor.
 -- lights[2] will be rotated at 60RPM
 local lights = {
-	{
+    {
         x = 0,
         y = 0,
         color = {0.5, 0.5, 0.5, 1},
@@ -54,7 +54,7 @@ local lights = {
         angle = 0,
         image = light_texture
     }, 
-	{
+    {
         x = 550,
         y = 300,
         color = {0.7, 0, 0.2, 1},
@@ -62,7 +62,7 @@ local lights = {
         angle = 0,
         image = spotlight_texture
     }, 
-	{
+    {
         x = 50,
         y = 50,
         color = {0.1, 0, 0.3, 1},
@@ -134,132 +134,132 @@ local shader_vblur = love.graphics.newShader([[
 -- world_blocks defines the solid walls in the demo.
 -- each block is of the form { x, y, w, h, r }
 local world_blocks = {
-	{ x = 300, y = 300, w = 100, h = 100 },
-	{ x = 100, y = 400, w = 50, h = 200 },
-	{ x = 500, y = 400, w = 100, h = 10 },
-	{ x = 300, y = 100, w = 130, h = 100 },
+    { x = 300, y = 300, w = 100, h = 100 },
+    { x = 100, y = 400, w = 50, h = 200 },
+    { x = 500, y = 400, w = 100, h = 10 },
+    { x = 300, y = 100, w = 130, h = 100 },
 }
 
 function love.load()
-	print('Starting shadow demo.')
+    print('Starting shadow demo.')
 
-	local sw, sh = love.graphics.getDimensions()
+    local sw, sh = love.graphics.getDimensions()
 
-	--[[
-		first, we need to generate a list of line segments representing the
-		outline of the world. this will be very important in computing the
-		geometry of the shadows.
+    --[[
+        first, we need to generate a list of line segments representing the
+        outline of the world. this will be very important in computing the
+        geometry of the shadows.
 
-		we also compute the normal vector for each segment. this will be useful
-		in culling out front-facing segments (which we do NOT want to cast
-		shadows from)
-	--]]
+        we also compute the normal vector for each segment. this will be useful
+        in culling out front-facing segments (which we do NOT want to cast
+        shadows from)
+    --]]
 
-	for _, v in ipairs(world_blocks) do
-		-- compute the segments in a clockwise manner
+    for _, v in ipairs(world_blocks) do
+        -- compute the segments in a clockwise manner
 
-		v.segments = {
-			{
-			  a = { x = v.x, y = v.y },
-			  b = { x = v.x + v.w, y = v.y },
-			  normal = { x = 0, y = -1 },
-			},
-			{
-			  a = { x = v.x + v.w, y = v.y },
-			  b = { x = v.x + v.w, y = v.y + v.h },
-			  normal = { x = 1, y = 0 },
-			},
-			{
-			  a = { x = v.x + v.w, y = v.y + v.h },
-			  b = { x = v.x, y = v.y + v.h },
-			  normal = { x = 0, y = 1 },
-			},
-			{
-			  a = { x = v.x, y = v.y + v.h },
-			  b = { x = v.x, y = v.y },
-			  normal = { x = -1, y = 0 },
-			},
-		}
-	end
+        v.segments = {
+            {
+              a = { x = v.x, y = v.y },
+              b = { x = v.x + v.w, y = v.y },
+              normal = { x = 0, y = -1 },
+            },
+            {
+              a = { x = v.x + v.w, y = v.y },
+              b = { x = v.x + v.w, y = v.y + v.h },
+              normal = { x = 1, y = 0 },
+            },
+            {
+              a = { x = v.x + v.w, y = v.y + v.h },
+              b = { x = v.x, y = v.y + v.h },
+              normal = { x = 0, y = 1 },
+            },
+            {
+              a = { x = v.x, y = v.y + v.h },
+              b = { x = v.x, y = v.y },
+              normal = { x = -1, y = 0 },
+            },
+        }
+    end
 
-	--[[
-		next, we need to do some preparation for each light; we need a render
-		target for each light to store the pixels it's illuminating (lightmap)
-	--]]
+    --[[
+        next, we need to do some preparation for each light; we need a render
+        target for each light to store the pixels it's illuminating (lightmap)
+    --]]
 
-	for _, v in ipairs(lights) do
-		v.lightmap = love.graphics.newCanvas(v.radius * 2, v.radius * 2)
-	end
+    for _, v in ipairs(lights) do
+        v.lightmap = love.graphics.newCanvas(v.radius * 2, v.radius * 2)
+    end
 
-	--[[
-		finally, initialize the screen lightmap and world canvas
-	--]]
+    --[[
+        finally, initialize the screen lightmap and world canvas
+    --]]
 
-	screen_lightmap = love.graphics.newCanvas(sw, sh)
-	screen_lightmap_blur = love.graphics.newCanvas(sw, sh)
+    screen_lightmap = love.graphics.newCanvas(sw, sh)
+    screen_lightmap_blur = love.graphics.newCanvas(sw, sh)
     world_canvas = love.graphics.newCanvas(sw, sh)
 end
 
 function love.resize(w, h)
-	-- regenerate render targets that depend on the window size
-	screen_lightmap = love.graphics.newCanvas(w, h)
-	screen_lightmap_blur = love.graphics.newCanvas(w, h)
-	world_canvas = love.graphics.newCanvas(w, h)
+    -- regenerate render targets that depend on the window size
+    screen_lightmap = love.graphics.newCanvas(w, h)
+    screen_lightmap_blur = love.graphics.newCanvas(w, h)
+    world_canvas = love.graphics.newCanvas(w, h)
 end
 
 function love.update(dt)
-	-- here we'll update the light location from the cursor.
-	lights[1].x, lights[1].y = love.mouse.getPosition()
+    -- here we'll update the light location from the cursor.
+    lights[1].x, lights[1].y = love.mouse.getPosition()
     lights[2].angle = lights[2].angle + dt * 3.141
 end
 
 function love.draw()
-	--[[
-		the render pipeline is as follows:
-			(1) each light's 'lightmap' is filled with the 'light_texture' data
-			(2) for each light, render black shadows over their lightmap in the
-			    appropriate locations.
-			(3) the screen lightmap is cleared to black
-			(4) each light's lightmap is additively drawn to 'screen_lightmap'
-			    in the appropriate locations.
-			(5) the world is drawn using 'screen_lightmap' to determine each
-				pixels' illumination
-	--]]
+    --[[
+        the render pipeline is as follows:
+            (1) each light's 'lightmap' is filled with the 'light_texture' data
+            (2) for each light, render black shadows over their lightmap in the
+                appropriate locations.
+            (3) the screen lightmap is cleared to black
+            (4) each light's lightmap is additively drawn to 'screen_lightmap'
+                in the appropriate locations.
+            (5) the world is drawn using 'screen_lightmap' to determine each
+                pixels' illumination
+    --]]
 
     local sw, sh = love.graphics.getDimensions()
 
-	--[[
-		(1) clear each light's RT to 'light_texture'
-	--]]
+    --[[
+        (1) clear each light's RT to 'light_texture'
+    --]]
 
-	for _, v in ipairs(lights) do
+    for _, v in ipairs(lights) do
         local lt_w, lt_h = v.image:getDimensions()
 
-		love.graphics.setCanvas(v.lightmap)
+        love.graphics.setCanvas(v.lightmap)
         love.graphics.clear()
         love.graphics.setColor(v.color)
         love.graphics.push()
         love.graphics.translate(v.radius, v.radius)
         love.graphics.rotate(v.angle)
         love.graphics.translate(-v.radius, -v.radius)
-		love.graphics.draw(v.image, 0, 0, 0, 
-						   v.radius * 2 / lt_w,
-						   v.radius * 2 / lt_h)
+        love.graphics.draw(v.image, 0, 0, 0, 
+                           v.radius * 2 / lt_w,
+                           v.radius * 2 / lt_h)
         love.graphics.pop()
-	end
+    end
 
-	--[[
-		(2) render shadow onto lightmaps
-	--]]
+    --[[
+        (2) render shadow onto lightmaps
+    --]]
 
-	for _, light in ipairs(lights) do
-		love.graphics.setCanvas(light.lightmap)
+    for _, light in ipairs(lights) do
+        love.graphics.setCanvas(light.lightmap)
         love.graphics.setColor(0, 0, 0, 1)
 
-		-- we want to draw a quadrilateral from each back-facing edge
-		-- so, start iterating world line segments and testing the normals
+        -- we want to draw a quadrilateral from each back-facing edge
+        -- so, start iterating world line segments and testing the normals
 
-		for _, block in ipairs(world_blocks) do
+        for _, block in ipairs(world_blocks) do
             for _, segment in ipairs(block.segments) do
                 -- is the segment normal facing away from the light?
                 if segment_back_facing(light, segment) then
@@ -318,8 +318,8 @@ function love.draw()
                     love.graphics.pop()
                 end
             end
-		end
-	end
+        end
+    end
 
     --[[
         (3, 4) render each individual lightmap onto the screen lightmap
