@@ -72,6 +72,26 @@ local lights = {
     },
 }
 
+-- 'ambient_lights' contains light areas used for static global illumination
+local ambient_lights = {
+    {
+        x = 250,
+        y = 200,
+        w = 200,
+        h = 100,
+        color = {0.5, 0, 0.5, 1},
+    },
+    {
+        x = 500,
+        y = 500,
+        w = 200,
+        h = 200,
+        color = {0, 0.5, 0.5, 1},
+    }
+}
+
+local ambient_lights_generated = false
+
 -- 'shader_compose' stores a pixel shader used to combine 'screen_lightmap' and
 -- 'world_canvas' into the final rendering result
 local shader_compose = love.graphics.newShader([[
@@ -95,15 +115,16 @@ local shader_hblur = love.graphics.newShader([[
     uniform vec2 tc_pixel_dist;
 
     vec4 effect(vec4 color, Image tex, vec2 texture_coords, vec2 screen_coords) {
-        const float kernel[7] = float[7](
-            0.00598, 0.06062, 0.24184, 0.38310,
-            0.24184, 0.06062, 0.00598
+        const float kernel[9] = float[9](
+            0.000229, 0.005977, 0.060598,
+            0.241732, 0.382928, 0.241732,
+            0.060598, 0.005977, 0.000229
         );
 
         vec4 out_color = vec4(0.0);
 
-        for (int i = -3; i <= 3; ++i) {
-            out_color += vec4(kernel[i + 3]) * Texel(tex, texture_coords + vec2(tc_pixel_dist.x, 0.0) * i);
+        for (int i = -4; i <= 4; ++i) {
+            out_color += vec4(kernel[i + 4]) * Texel(tex, texture_coords + vec2(tc_pixel_dist.x, 0.0) * i);
         }
 
         out_color.a = 1.0;
@@ -115,15 +136,16 @@ local shader_vblur = love.graphics.newShader([[
     uniform vec2 tc_pixel_dist;
 
     vec4 effect(vec4 color, Image tex, vec2 texture_coords, vec2 screen_coords) {
-        const float kernel[7] = float[7](
-            0.00598, 0.06062, 0.24184, 0.38310,
-            0.24184, 0.06062, 0.00598
+        const float kernel[9] = float[9](
+            0.000229, 0.005977, 0.060598,
+            0.241732, 0.382928, 0.241732,
+            0.060598, 0.005977, 0.000229
         );
 
         vec4 out_color = vec4(0.0);
 
-        for (int i = -3; i <= 3; ++i) {
-            out_color += vec4(kernel[i + 3]) * Texel(tex, texture_coords + vec2(0.0, tc_pixel_dist.x) * i);
+        for (int i = -4; i <= 4; ++i) {
+            out_color += vec4(kernel[i + 4]) * Texel(tex, texture_coords + vec2(0.0, tc_pixel_dist.x) * i);
         }
 
         out_color.a = 1.0;
@@ -138,7 +160,99 @@ local world_blocks = {
     { x = 100, y = 400, w = 50, h = 200 },
     { x = 500, y = 400, w = 100, h = 10 },
     { x = 300, y = 100, w = 130, h = 100 },
+    { x = 600, y = 600, w = 300, h = 100 },
 }
+
+function generate_ambient_lightmaps()
+    --[[
+        generate ambient lightmaps one time so we can use them later
+
+        to do this, we render the light rectangle as a solid into the lightmap.
+        the lightmap is blurred into itself and then the world is rendered as black blocks.
+
+        this is repeated N times (diffusion passes)
+
+        then, the image is blurred into itself M times (smoothing passes)
+    --]]
+    
+    if ambient_lights_generated then
+        return
+    else
+        ambient_lights_generated = true
+    end
+
+    print('Generating ambient lightmaps..')
+
+    local blur_map = function (map, alt, pixel_factor)
+        local mapw, maph = map:getDimensions()
+
+        -- horizontal blur pass
+        love.graphics.setColor(1, 1, 1, 1)
+        love.graphics.setCanvas(alt)
+        love.graphics.clear()
+        love.graphics.setShader(shader_hblur)
+        love.graphics.setBlendMode('replace')
+
+        shader_hblur:send('tc_pixel_dist', { 2 * pixel_factor / mapw, 2 * pixel_factor / maph })
+
+        love.graphics.draw(map, 0, 0)
+
+        -- vertical blur pass
+
+        love.graphics.setCanvas(map)
+        love.graphics.clear()
+        love.graphics.setShader(shader_vblur)
+
+        shader_vblur:send('tc_pixel_dist', { 2 * pixel_factor / mapw, 2 * pixel_factor / maph })
+
+        love.graphics.draw(alt, 0, 0)
+    end
+
+    for _, light in ipairs(ambient_lights) do
+        -- initialize lightmap with solid centered light rect
+        love.graphics.setCanvas(light.lightmap)
+        love.graphics.clear()
+        love.graphics.setColor(light.color)
+        love.graphics.setBlendMode('replace')
+        love.graphics.rectangle('fill', light.w + light.w / 2, light.h + light.h / 2, light.w, light.h)
+
+        local diffusion_passes = 1000
+        local bleed_passes = 1000
+        local smooth_passes = 500
+
+        -- perform diffusion passes
+        for _=1,diffusion_passes do
+            -- blur the lightmap
+            blur_map(light.lightmap, light.lightmap_alt, 8)
+
+            -- re-draw the world as shadows
+            love.graphics.setCanvas(light.lightmap)
+            love.graphics.setBlendMode('replace')
+            love.graphics.setShader()
+
+            -- EXPERIMENTAL: re-render the light as well during diffusion
+            love.graphics.setColor(light.color)
+            love.graphics.rectangle('fill', light.w + light.w / 2, light.h + light.h / 2, light.w, light.h)
+
+            love.graphics.setColor(0, 0, 0, 1)
+            for _, block in ipairs(world_blocks) do
+                love.graphics.rectangle('fill', block.x - (light.x + light.w / 2) + 2 * light.w,
+                                                block.y - (light.y + light.h / 2) + 2 * light.h,
+                                                block.w, block.h)
+            end
+        end
+
+        -- perform bleed passes
+        for _=1,bleed_passes do
+            blur_map(light.lightmap, light.lightmap_alt, 4)
+        end
+        
+        -- perform smoothing passes
+        for _=1,smooth_passes do
+            blur_map(light.lightmap, light.lightmap_alt, 1)
+        end
+    end
+end
 
 function love.load()
     print('Starting shadow demo.')
@@ -191,6 +305,12 @@ function love.load()
         v.lightmap = love.graphics.newCanvas(v.radius * 2, v.radius * 2)
     end
 
+    for _, v in ipairs(ambient_lights) do
+        v.lightmap = love.graphics.newCanvas(v.w * 4, v.h * 4)
+        v.lightmap_alt = love.graphics.newCanvas(v.w * 4, v.h * 4)
+    end
+
+
     --[[
         finally, initialize the screen lightmap and world canvas
     --]]
@@ -225,6 +345,8 @@ function love.draw()
             (5) the world is drawn using 'screen_lightmap' to determine each
                 pixels' illumination
     --]]
+
+    generate_ambient_lightmaps()
 
     local sw, sh = love.graphics.getDimensions()
 
@@ -332,6 +454,14 @@ function love.draw()
 
     for _, light in ipairs(lights) do
         love.graphics.draw(light.lightmap, light.x - light.radius, light.y - light.radius)
+    end
+
+    --[[
+        render ambient lights to the screen lightmap
+    --]]
+    
+    for _, light in ipairs(ambient_lights) do
+        love.graphics.draw(light.lightmap, light.x + light.w / 2 - 2 * light.w, light.y + light.h / 2 - 2 * light.h)
     end
 
     -- blur the screen lightmap onto itself to smooth lights
